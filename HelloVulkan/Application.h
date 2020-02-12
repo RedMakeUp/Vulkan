@@ -29,7 +29,12 @@ private:
     void InitWindow();
     void InitVulkan();
     void MainLoop();
+
+    // Clean up all resources using by Vulkan and GLFW
     void Cleanup();
+    // Clean up all objects related with swap chain
+    void CleanupSwapChain();
+
     void SetupDebugMassenger();
     void CreateInstance();
     void PickPhysicalDevice();
@@ -52,6 +57,7 @@ private:
     void CreateCommandBuffers();
     void CreateSyncObjects();
     void DrawFrame();
+    void RecreateSwapChain();
 
 private:
 
@@ -79,4 +85,6 @@ private:
     std::vector<VkFence> m_inflightFences;
     std::vector<VkFence> m_imagesInFlight;
     size_t m_currentFrame = 0;
+
+    bool m_frameBufferResized = false;
 };
