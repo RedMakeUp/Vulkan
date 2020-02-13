@@ -23,12 +23,17 @@ private:
     };
 
 public:
+    // Call this function to run the program
     void Run();
 
 private:
-    void InitWindow();
-    void InitVulkan();
+    // Main loop
     void MainLoop();
+
+    // Initialize window creation
+    void InitWindow();
+    // Initialize Vulank staffs
+    void InitVulkan();
 
     // Clean up all resources using by Vulkan and GLFW
     void Cleanup();
@@ -58,6 +63,14 @@ private:
     void CreateSyncObjects();
     void DrawFrame();
     void RecreateSwapChain();
+
+private:
+    // Check if the validation layers we need are supported
+    static bool CheckValidationLayerSupport();
+    // Check if the Vulkan extensions required by GLFW are supported by local Vulkan 
+    static bool CheckExtensionsValidation();
+    // Return all extensions that are actually needed for this application
+    static std::vector<const char*> GetRequiredExtensions();
 
 private:
 

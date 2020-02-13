@@ -22,6 +22,9 @@ constexpr int WINDOW_WIDTH = 800;
 constexpr int WINDOW_HEIGHT = 600;
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+// If @result is not VK_SUCCESS, throw a std::runtime_error with description @text
+#define ThrowIfFailed(result, text) if(result != VK_SUCCESS){throw std::runtime_error(text);}
+
 
 const std::vector<const char*> g_validationLayers = {
     "VK_LAYER_KHRONOS_validation"
@@ -41,6 +44,94 @@ T Clamp(T value, T minValue, T maxValue){
         return value;
     }
 }
+
+
+/////////////////////////////////////////////////////////////////////////////////
+// Static member functions //////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+bool Application::CheckValidationLayerSupport()
+{
+    // Get all avaliable layers in local Vulkan
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    std::vector<VkLayerProperties> avabliableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, avabliableLayers.data());
+
+    // Check the inclusion between avabliableLayers we got above and g_validationLayers which we actually need
+    for (const char *layerName : g_validationLayers)
+    {
+        bool isFound = false;
+
+        for (const auto &layerProperties : avabliableLayers)
+        {
+            if (strcmp(layerName, layerProperties.layerName) == 0)
+            {
+                isFound = true;
+                break;
+            }
+        }
+
+        if (!isFound)
+            return false;
+    }
+
+    return true;
+}
+
+bool Application::CheckExtensionsValidation()
+{
+    // Require extensions through GLFW
+    uint32_t glfwExtensionCount = 0;
+    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+    // Require extensions through Vulkan
+    uint32_t extensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+    // Check the inclusion between two extension list required above
+    if (glfwExtensionCount > extensionCount)
+    {
+        return false;
+    }
+    else
+    {
+        for (uint32_t i = 0; i < glfwExtensionCount; i++)
+        {
+            bool isIncluded = false;
+            for (const auto &ext : extensions)
+            {
+                if (strcmp(ext.extensionName, glfwExtensions[i]) == 0)
+                {
+                    isIncluded = true;
+                    break;
+                }
+            }
+
+            if (!isIncluded)
+                return false;
+        }
+    }
+
+    return true;
+}
+
+std::vector<const char*> Application::GetRequiredExtensions()
+{
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+    std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+    #if ENABLE_VALIDATION_LAYERS
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    #endif
+
+    return extensions;
+}
+
+
 
 // Be careful the file path which is relative to path of the execuable when you just run it,
 // and is relative to path of CMakeLists.txt when you debug using CMake Tool in Vs code. 
@@ -81,88 +172,6 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     {
         func(instance, debugMessenger, pAllocator);
     }
-}
-
-bool CheckValidationLayerSupport()
-{
-    uint32_t layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    std::vector<VkLayerProperties> avabliableLayers(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, avabliableLayers.data());
-
-    for (const char *layerName : g_validationLayers)
-    {
-        bool isFound = false;
-
-        for (const auto &layerProperties : avabliableLayers)
-        {
-            //std::cout << layerName << " -- " << layerProperties.layerName << std::endl;
-
-            if (strcmp(layerName, layerProperties.layerName) == 0)
-            {
-                isFound = true;
-                break;
-            }
-        }
-
-        if (!isFound)
-            return false;
-    }
-
-    return true;
-}
-
-bool CheckExtensionsValidation()
-{
-    // Require extensions through GLFW
-    uint32_t glfwExtensionCount = 0;
-    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-    // Require extensions through VK
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> extensions(extensionCount);
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-    if (glfwExtensionCount > extensionCount)
-    {
-        return false;
-    }
-    else
-    {
-        for (uint32_t i = 0; i < glfwExtensionCount; i++)
-        {
-            bool isIncluded = false;
-            for (const auto &ext : extensions)
-            {
-                if (strcmp(ext.extensionName, glfwExtensions[i]) == 0)
-                {
-                    isIncluded = true;
-                    break;
-                }
-            }
-
-            if (!isIncluded)
-                return false;
-        }
-    }
-
-    return true;
-}
-
-std::vector<const char *> GetRequiredExtensions()
-{
-    uint32_t glfwExtensionCount = 0;
-    const char **glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-    std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-    #if ENABLE_VALIDATION_LAYERS
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    #endif
-
-    return extensions;
 }
 
 // Output number and name of extensions required by GLFW to console
@@ -218,6 +227,9 @@ void PopulateDebugMEssengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& create
     createInfo.pUserData = nullptr;
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+// Non-static member functions //////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 void Application::Run()
 {
     InitWindow();
@@ -228,20 +240,24 @@ void Application::Run()
 
 void Application::InitWindow()
 {
+    // Initialize GLFW library
     glfwInit();
 
+    // Check if all extensions required bt GLFW are supported
+    if(!CheckExtensionsValidation()) { throw std::runtime_error("Extensions required by GLFW is not validated"); }
+
+    // This is a Vulkan application, so we don't want OpenGL context
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    //glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // The window can be resized
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-    if (!CheckExtensionsValidation())
-    {
-        throw std::runtime_error("Extensions required by GLFW is not validated");
-    }
-
+    // Create main window
     m_window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", nullptr, nullptr);
+    // Set user pointer for the window in order to access other class members from GLFW custom callback functions
     glfwSetWindowUserPointer(m_window, this);
 
-    glfwSetFramebufferSizeCallback(m_window,[](GLFWwindow* window, int width, int height){
+    // Set callback function for window resizing
+    glfwSetFramebufferSizeCallback(m_window, [](GLFWwindow* window, int width, int height){
         auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
 
         app->m_frameBufferResized = true;
@@ -250,6 +266,10 @@ void Application::InitWindow()
 
 void Application::InitVulkan()
 {
+    #if ENABLE_VALIDATION_LAYERS
+        if(!CheckValidationLayerSupport()) { throw std::runtime_error("Validation layers requested, but not available!"); }
+    #endif
+
     CreateInstance();
     SetupDebugMassenger();
     CreateSurface();
@@ -325,11 +345,7 @@ void Application::SetupDebugMassenger()
 
 void Application::CreateInstance()
 {
-    #if ENABLE_VALIDATION_LAYERS
-        if (!CheckValidationLayerSupport())
-            throw std::runtime_error("Validation layers requested, but not available!");
-    #endif
-
+    // Informations about this application
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Hello Triangle";
@@ -338,6 +354,7 @@ void Application::CreateInstance()
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_1;
 
+    // Informations about global extensions and validation layers we want to use
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
@@ -355,10 +372,8 @@ void Application::CreateInstance()
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data();
 
-    if (vkCreateInstance(&createInfo, nullptr, &m_vkInstance) != VK_SUCCESS)
-    {
-        throw std::runtime_error("Failed to create instance!");
-    }
+    // Create Vulkan instance
+    ThrowIfFailed(vkCreateInstance(&createInfo, nullptr, &m_vkInstance), "Failed to create instance!");
 }
 
 void Application::PickPhysicalDevice(){
