@@ -71,6 +71,14 @@ private:
     static bool CheckExtensionsValidation();
     // Return all extensions that are actually needed for this application
     static std::vector<const char*> GetRequiredExtensions();
+    // Fill @createInfo with necessary debug messenger creation infomations
+    static void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+    // Callback function that handles messages from Validation layers
+    static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+        void *pUserData);
 
 private:
 

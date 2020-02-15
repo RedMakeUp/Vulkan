@@ -131,6 +131,47 @@ std::vector<const char*> Application::GetRequiredExtensions()
     return extensions;
 }
 
+void Application::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo){
+    createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = DebugCallback;
+    createInfo.pUserData = nullptr;
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL Application::DebugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+    void *pUserData)
+{
+    std::string severityStr = "Unknown"; 
+    switch (messageSeverity)
+    {
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+        severityStr = "[ Diagnostic ]";
+        break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+        severityStr = "[ Warning ]";
+        break;
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+        severityStr = "[ ERROR ]";
+        break;
+    default:
+        break;
+    }
+    std::cerr << "Validation layer" << severityStr << ": " << pCallbackData->pMessage << std::endl;
+
+    return VK_FALSE;
+}
+
 
 
 // Be careful the file path which is relative to path of the execuable when you just run it,
@@ -201,31 +242,6 @@ void DebugVulkanExtensios()
     }
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageType,
-    const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-    void *pUserData)
-{
-    std::cerr << "Validation layer: " << pCallbackData->pMessage << std::endl;
-
-    return VK_FALSE;
-}
-
-void PopulateDebugMEssengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo){
-    createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity =
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo.messageType =
-        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = DebugCallback;
-    createInfo.pUserData = nullptr;
-}
 
 /////////////////////////////////////////////////////////////////////////////////
 // Non-static member functions //////////////////////////////////////////////////
@@ -272,7 +288,7 @@ void Application::InitVulkan()
 
     CreateInstance();
     SetupDebugMassenger();
-    CreateSurface();
+    CreateSurface();// TODO: Step into here
     PickPhysicalDevice();
     CreateLogicalDevice();
     CreateSwapChain();
@@ -334,12 +350,10 @@ void Application::SetupDebugMassenger()
 {
     #if ENABLE_VALIDATION_LAYERS
         VkDebugUtilsMessengerCreateInfoEXT createInfo;
-        PopulateDebugMEssengerCreateInfo(createInfo);
+        PopulateDebugMessengerCreateInfo(createInfo);
 
-        if (CreateDebugUtilsMessengerEXT(m_vkInstance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS)
-        {
-            throw std::runtime_error("Failed to set up debug messenger!");
-        }
+        ThrowIfFailed(CreateDebugUtilsMessengerEXT(m_vkInstance, &createInfo, nullptr, &m_debugMessenger),
+            "Failed to set up debug messenger!");
     #endif
 }
 
@@ -365,7 +379,8 @@ void Application::CreateInstance()
         createInfo.enabledLayerCount = static_cast<uint32_t>(g_validationLayers.size());
         createInfo.ppEnabledLayerNames = g_validationLayers.data();
 
-        PopulateDebugMEssengerCreateInfo(debugCreateInfo);
+        // Create an additional debug messenger for vkCreateInstance and vkDestroyInstance and clean up after that
+        PopulateDebugMessengerCreateInfo(debugCreateInfo);
         createInfo.pNext = static_cast<VkDebugUtilsMessengerCreateInfoEXT*>(&debugCreateInfo);
     #endif
     auto extensions = GetRequiredExtensions();
@@ -567,7 +582,13 @@ VkExtent2D Application::ChooseSwapChainExtent(const VkSurfaceCapabilitiesKHR& ca
         int width, height;
         glfwGetFramebufferSize(m_window, &width, &height);
 
-        VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+        VkExtent2D actualExtent = {
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height)
+        };
+
+        actualExtent.width = Clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        actualExtent.height = Clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
         return actualExtent;
     }
