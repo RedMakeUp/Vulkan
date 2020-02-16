@@ -78,7 +78,7 @@ bool Application::CheckValidationLayerSupport()
     return true;
 }
 
-bool Application::CheckExtensionsValidation()
+bool Application::CheckGLFWExtensionSupport()
 {
     // Require extensions through GLFW
     uint32_t glfwExtensionCount = 0;
@@ -115,6 +115,21 @@ bool Application::CheckExtensionsValidation()
     }
 
     return true;
+}
+
+bool Application::CheckDeviceExtensionSupport(VkPhysicalDevice device){
+    uint32_t extensionCount;
+    vkEnumerateDeviceExtensionProperties(device,nullptr,&extensionCount,nullptr);
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(device,nullptr,&extensionCount,availableExtensions.data());
+
+    std::set<std::string> requiredExtensions(g_deviceEntensions.begin(),g_deviceEntensions.end());
+
+    for(const auto& extension: availableExtensions){
+        requiredExtensions.erase(extension.extensionName);
+    }
+    
+    return requiredExtensions.empty();
 }
 
 std::vector<const char*> Application::GetRequiredExtensions()
@@ -260,7 +275,7 @@ void Application::InitWindow()
     glfwInit();
 
     // Check if all extensions required bt GLFW are supported
-    if(!CheckExtensionsValidation()) { throw std::runtime_error("Extensions required by GLFW is not validated"); }
+    if(!CheckGLFWExtensionSupport()) { throw std::runtime_error("Extensions required by GLFW is not validated"); }
 
     // This is a Vulkan application, so we don't want OpenGL context
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -288,9 +303,9 @@ void Application::InitVulkan()
 
     CreateInstance();
     SetupDebugMassenger();
-    CreateSurface();// TODO: Step into here
+    CreateSurface();
     PickPhysicalDevice();
-    CreateLogicalDevice();
+    CreateLogicalDevice();// TODO: Step into here
     CreateSwapChain();
     CreateImageViews();
     CreateRenderPass();
@@ -402,7 +417,7 @@ void Application::PickPhysicalDevice(){
     vkEnumeratePhysicalDevices(m_vkInstance, &deviceCount, devices.data());
 
     for(const auto& device:devices){
-        if(IsDeviceSuitable(device)){
+        if(IsPhysicalDeviceSuitable(device)){
             m_physicalDevice = device;
             break;
         }
@@ -411,10 +426,9 @@ void Application::PickPhysicalDevice(){
     if(m_physicalDevice == VK_NULL_HANDLE){
         throw std::runtime_error("Failed to find a suitable GPU!");
     }
-
 }
 
-bool Application ::IsDeviceSuitable(VkPhysicalDevice device){
+bool Application ::IsPhysicalDeviceSuitable(VkPhysicalDevice device){
     VkPhysicalDeviceProperties deviceProperties;
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
@@ -447,7 +461,6 @@ Application::QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice 
 
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
@@ -511,24 +524,8 @@ void Application::CreateLogicalDevice(){
 }
 
 void Application::CreateSurface(){
-    if(glfwCreateWindowSurface(m_vkInstance, m_window, nullptr, &m_surface) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create window surface!");
-    }
-}
-
-bool Application::CheckDeviceExtensionSupport(VkPhysicalDevice device){
-    uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(device,nullptr,&extensionCount,nullptr);
-    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(device,nullptr,&extensionCount,availableExtensions.data());
-
-    std::set<std::string> requiredExtensions(g_deviceEntensions.begin(),g_deviceEntensions.end());
-
-    for(const auto& extension: availableExtensions){
-        requiredExtensions.erase(extension.extensionName);
-    }
-    
-    return requiredExtensions.empty();
+    ThrowIfFailed(glfwCreateWindowSurface(m_vkInstance, m_window, nullptr, &m_surface),
+        "Failed to create window surface!");
 }
 
 Application::SwapChainSupportDetails Application::QuerySwapChainSupport(VkPhysicalDevice device){

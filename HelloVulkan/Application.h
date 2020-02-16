@@ -40,15 +40,22 @@ private:
     // Clean up all objects related with swap chain
     void CleanupSwapChain();
 
-    void SetupDebugMassenger();
+    // Create a Vulkan instance
     void CreateInstance();
+
+    // Look up all suitable pyhsical devices(GPUs) and pick up the first one
     void PickPhysicalDevice();
-    bool IsDeviceSuitable(VkPhysicalDevice device);
+    bool IsPhysicalDeviceSuitable(VkPhysicalDevice device);
+
+    // Loop up all queue fanilies of the @device and pick up the first suitable one
     QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
+
+    // Setup debug messenger through validation layers
+    void SetupDebugMassenger();
+
     SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
     void CreateLogicalDevice();
     void CreateSurface();
-    bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
     VkSurfaceFormatKHR ChooseSwapChainSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
     VkPresentModeKHR ChooseSwapChainPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
     VkExtent2D ChooseSwapChainExtent(const VkSurfaceCapabilitiesKHR& capabilities);
@@ -68,11 +75,13 @@ private:
     // Check if the validation layers we need are supported
     static bool CheckValidationLayerSupport();
     // Check if the Vulkan extensions required by GLFW are supported by local Vulkan 
-    static bool CheckExtensionsValidation();
-    // Return all extensions that are actually needed for this application
-    static std::vector<const char*> GetRequiredExtensions();
+    static bool CheckGLFWExtensionSupport();
+    // Check if the extensions we need for specific physical device are supported by that device 
+    static bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
     // Fill @createInfo with necessary debug messenger creation infomations
     static void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+    // Return all extensions that are actually needed for this application
+    static std::vector<const char*> GetRequiredExtensions();
     // Callback function that handles messages from Validation layers
     static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
