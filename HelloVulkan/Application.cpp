@@ -305,7 +305,7 @@ void Application::InitVulkan()
     SetupDebugMassenger();
     CreateSurface();
     PickPhysicalDevice();
-    CreateLogicalDevice();// TODO: Step into here
+    CreateLogicalDevice();
     CreateSwapChain();
     CreateImageViews();
     CreateRenderPass();
@@ -485,11 +485,10 @@ Application::QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice 
 }
 
 void Application::CreateLogicalDevice(){
-    QueueFamilyIndices indices = FindQueueFamilies(m_physicalDevice);
-
+    // Specify the queue information we actually need
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    QueueFamilyIndices indices = FindQueueFamilies(m_physicalDevice);
     std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
-
     float queuePriority = 1.0;
     for(uint32_t queueFamily: uniqueQueueFamilies){
         VkDeviceQueueCreateInfo queueCreateInfo = {};
@@ -500,25 +499,31 @@ void Application::CreateLogicalDevice(){
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures = {};
-
     VkDeviceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    // Require queue families
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    // Require features
+    VkPhysicalDeviceFeatures deviceFeatures = {};
     createInfo.pEnabledFeatures = &deviceFeatures;
+    // Require extensions
     createInfo.enabledExtensionCount = static_cast<uint32_t>(g_deviceEntensions.size());
     createInfo.ppEnabledExtensionNames = g_deviceEntensions.data();
+    // Require validation layers
+    // Note: enabledLayerCount and ppEnabledLayerNames are deprecated by up-to-date implementations
     createInfo.enabledLayerCount = 0;
     #if ENABLE_VALIDATION_LAYERS
         createInfo.enabledLayerCount = static_cast<uint32_t>(g_validationLayers.size());
         createInfo.ppEnabledLayerNames = g_validationLayers.data();
     #endif
 
-    if(vkCreateDevice(m_physicalDevice,&createInfo,nullptr,&m_device) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create logical device!");
-    }
+    // Create logical device
+    ThrowIfFailed(vkCreateDevice(m_physicalDevice,&createInfo,nullptr,&m_device), 
+        "Failed to create logical device!");
 
+    // Retrieve queue handles
+    // Note: For each queue family, we only need one queue
     vkGetDeviceQueue(m_device, indices.graphicsFamily.value(), 0, &m_graphicsQueue);
     vkGetDeviceQueue(m_device, indices.presentFamily.value(), 0, &m_presentQueue);
 }
@@ -531,8 +536,11 @@ void Application::CreateSurface(){
 Application::SwapChainSupportDetails Application::QuerySwapChainSupport(VkPhysicalDevice device){
     SwapChainSupportDetails details;
 
+    // This function wiil take the specified VkPhysicalDevice and VkSurfaceKHR window surface into account when 
+    // determining the supported capabilities
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_surface, &details.capabilities);
 
+    // Query the supported surface formats
     uint32_t formatCount = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, nullptr);
     if(formatCount != 0){
@@ -540,6 +548,7 @@ Application::SwapChainSupportDetails Application::QuerySwapChainSupport(VkPhysic
         vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, details.formats.data());
     }
 
+    // Query the supported presentation mode
     uint32_t presentModeCount = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, nullptr);
     if(presentModeCount != 0){
@@ -598,6 +607,7 @@ void Application::CreateSwapChain(){
     auto presentMode = ChooseSwapChainPresentMode(swapChainDetails.presentModes);
     auto extent = ChooseSwapChainExtent(swapChainDetails.capabilities);
 
+    // Use two images at least and not exceed the maximum supported number
     uint32_t imageCount = swapChainDetails.capabilities.minImageCount + 1;
     if(swapChainDetails.capabilities.maxImageCount > 0 && imageCount > swapChainDetails.capabilities.maxImageCount){
         imageCount = swapChainDetails.capabilities.maxImageCount;
@@ -610,31 +620,39 @@ void Application::CreateSwapChain(){
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageArrayLayers = 1;// Always 1 unless stereoscopic 3D application
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;// Directly render to these images
 
+    // We'll be drawing on the images in the swap chain from the graphics queue and then submitting 
+    // them on the presentation queue
     auto indices = FindQueueFamilies(m_physicalDevice);
     uint32_t queueFamilyindices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
     if(indices.graphicsFamily != indices.presentFamily){
+        // Images can be used across multiple queue families without explicit ownership transfers
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyindices;
     }else{
+        // The ownership of an image must be explicitly transfered begore using it in another queue family
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         createInfo.queueFamilyIndexCount = 0;
         createInfo.pQueueFamilyIndices = nullptr;
     }
 
+    // We do not want any transformation to be applied th images in the swap chain
     createInfo.preTransform = swapChainDetails.capabilities.currentTransform;
+    // We do not want the alpha channel to be used for blending with other window in the window system
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = presentMode;
+    // We don't care about the color of pixels that are obscured, for example, because another window is in front of them
     createInfo.clipped = VK_TRUE;
+    // Stop all rendering before a new swap chain is created
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    if(vkCreateSwapchainKHR(m_device, &createInfo, nullptr, &m_swapChain) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create swap chain!");
-    }
+    ThrowIfFailed(vkCreateSwapchainKHR(m_device, &createInfo, nullptr, &m_swapChain),
+        "Failed to create swap chain!");
 
+    // Access these images in the swap chain
     vkGetSwapchainImagesKHR(m_device, m_swapChain, &imageCount, nullptr);
     m_swapChainImages.resize(imageCount);
     vkGetSwapchainImagesKHR(m_device, m_swapChain, &imageCount, m_swapChainImages.data());
