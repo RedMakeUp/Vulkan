@@ -34,6 +34,29 @@ const std::vector<const char*> g_deviceEntensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+/////////////////////////////////////////////////////////////////////////////////
+// Static global functions //////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+
+// Be careful the file path which is relative to path of the execuable when you just run it,
+// and is relative to path of CMakeLists.txt when you debug using CMake Tool in Vs code. 
+std::vector<char> ReadFile(const std::string& filename){
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+    if(!file.is_open()){
+        throw std::runtime_error("Failed to open file: " + filename);
+    }
+
+    size_t fileSize = static_cast<size_t>(file.tellg());
+    std::vector<char> buffer(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+
+    file.close();
+
+    return buffer;
+}
+
 template<typename T>
 T Clamp(T value, T minValue, T maxValue){
     if(value > maxValue){
@@ -188,26 +211,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Application::DebugCallback(
 }
 
 
-
-// Be careful the file path which is relative to path of the execuable when you just run it,
-// and is relative to path of CMakeLists.txt when you debug using CMake Tool in Vs code. 
-std::vector<char> ReadFile(const std::string& filename){
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    if(!file.is_open()){
-        throw std::runtime_error("Failed to open file: " + filename);
-    }
-
-    size_t fileSize = static_cast<size_t>(file.tellg());
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-
-    file.close();
-
-    return buffer;
-}
-
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
 {
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -307,7 +310,7 @@ void Application::InitVulkan()
     PickPhysicalDevice();
     CreateLogicalDevice();
     CreateSwapChain();
-    CreateImageViews();
+    CreateImageViews();// Using images as 2D textures
     CreateRenderPass();
     CreateGraphicsPipeline();
     CreateFramebuffers();
@@ -668,21 +671,20 @@ void Application::CreateImageViews(){
         VkImageViewCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = m_swapChainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;// Treat images as 2D textures
         createInfo.format = m_swapChainImageFormat;
         createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;// Use images as color targets
+        createInfo.subresourceRange.baseMipLevel = 0;// Without any mipmapping levels
         createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.baseArrayLayer = 0;// Without any multiple layers
         createInfo.subresourceRange.layerCount = 1;
 
-        if(vkCreateImageView(m_device, &createInfo, nullptr, &m_swapChainImageViews[i]) != VK_SUCCESS){
-            throw std::runtime_error("Failed to create image views!");
-        }
+        ThrowIfFailed(vkCreateImageView(m_device, &createInfo, nullptr, &m_swapChainImageViews[i]),
+            "Failed to create image views!");
     }
 }
 
@@ -750,6 +752,7 @@ void Application::CreateGraphicsPipeline(){
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+    // TODO: Step into here
     // Vertex input
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -879,9 +882,8 @@ VkShaderModule Application::CreateShaderModule(const std::vector<char>& code){
     createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
     VkShaderModule shaderModule;
-    if(vkCreateShaderModule(m_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create shader module!");
-    }
+    ThrowIfFailed(vkCreateShaderModule(m_device, &createInfo, nullptr, &shaderModule),
+        "Failed to create shader module!");
 
     return shaderModule;
 }

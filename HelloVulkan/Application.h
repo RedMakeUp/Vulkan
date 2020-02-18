@@ -102,9 +102,9 @@ private:
     VkSurfaceKHR m_surface;
     VkSwapchainKHR m_swapChain;
     std::vector<VkImage> m_swapChainImages;
+    std::vector<VkImageView> m_swapChainImageViews;// Describes how to access the image and which part image to access
     VkFormat m_swapChainImageFormat;
     VkExtent2D m_swapChainExtent;
-    std::vector<VkImageView> m_swapChainImageViews;
     VkRenderPass m_renderPass;
     VkPipelineLayout m_pipelineLayout;
     VkPipeline m_graphicsPipeline;
