@@ -313,7 +313,7 @@ void Application::InitVulkan()
     CreateImageViews();// Using images as 2D textures
     CreateRenderPass();
     CreateGraphicsPipeline();
-    CreateFramebuffers();
+    CreateFramebuffers();// TODO: Step into here
     CreateCommandPool();
     CreateCommandBuffers();
     CreateSyncObjects();
@@ -689,6 +689,8 @@ void Application::CreateImageViews(){
 }
 
 void Application::CreateRenderPass(){
+    // A render pass could be considerd as a wrapper of resources and operations, where resources are attachments 
+    // and operations are subpass
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = m_swapChainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -725,14 +727,12 @@ void Application::CreateRenderPass(){
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
 
-    if(vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPass) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create render pass!");
-    }
-
+    ThrowIfFailed(vkCreateRenderPass(m_device, &renderPassInfo, nullptr, &m_renderPass),
+        "Failed to create render pass!");
 }
 
 void Application::CreateGraphicsPipeline(){
-    // Load shader codes
+    // Programmable shader stages
     auto vertShaderCode = ReadFile("shaders/vert.spv");
     auto fragShaderCode = ReadFile("shaders/frag.spv");
 
@@ -752,7 +752,7 @@ void Application::CreateGraphicsPipeline(){
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-    // TODO: Step into here
+    // Fixed functions
     // Vertex input
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -835,7 +835,7 @@ void Application::CreateGraphicsPipeline(){
     colorBlendInfo.blendConstants[2] = 0.0f;
     colorBlendInfo.blendConstants[3] = 0.0f;
 
-    // Pipeline layout
+    // Pipeline layout(Uniforms and push values)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 0;
@@ -843,9 +843,8 @@ void Application::CreateGraphicsPipeline(){
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-    if(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create pipeline layout!");
-    }
+    ThrowIfFailed(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_pipelineLayout),
+        "Failed to create pipeline layout!");
 
     // Finally, the graphics pipeline itself
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
@@ -866,10 +865,8 @@ void Application::CreateGraphicsPipeline(){
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
-    if(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create graphics pipelines!");
-    }
-
+    ThrowIfFailed(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline),
+        "Failed to create graphics pipelines!");
 
     vkDestroyShaderModule(m_device, fragShaderModule, nullptr);
     vkDestroyShaderModule(m_device, vertShaderModule, nullptr);
