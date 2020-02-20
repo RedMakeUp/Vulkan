@@ -313,10 +313,10 @@ void Application::InitVulkan()
     CreateImageViews();// Using images as 2D textures
     CreateRenderPass();
     CreateGraphicsPipeline();
-    CreateFramebuffers();// TODO: Step into here
+    CreateFramebuffers();
     CreateCommandPool();
     CreateCommandBuffers();
-    CreateSyncObjects();
+    CreateSyncObjects();// TODO: Step into here
 }
 
 void Application::MainLoop()
@@ -900,9 +900,8 @@ void Application::CreateFramebuffers(){
         framebufferInfo.height = m_swapChainExtent.height;
         framebufferInfo.layers = 1;
 
-        if(vkCreateFramebuffer(m_device, &framebufferInfo, nullptr, &m_swapChainFramebuffers[i]) != VK_SUCCESS){
-            throw std::runtime_error("Failed to create framebuffer!");
-        }
+        ThrowIfFailed(vkCreateFramebuffer(m_device, &framebufferInfo, nullptr, &m_swapChainFramebuffers[i]),
+            "Failed to create framebuffer!");
     }
 }
 
@@ -914,9 +913,8 @@ void Application::CreateCommandPool(){
     poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
     poolInfo.flags = 0;
 
-    if(vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create command pool!");
-    }
+    ThrowIfFailed(vkCreateCommandPool(m_device, &poolInfo, nullptr, &m_commandPool),
+        "Failed to create command pool!");
 }
 
 void Application::CreateCommandBuffers(){
@@ -928,18 +926,16 @@ void Application::CreateCommandBuffers(){
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = static_cast<uint32_t>(m_commandBuffers.size());
 
-    if(vkAllocateCommandBuffers(m_device, &allocInfo, m_commandBuffers.data()) != VK_SUCCESS){
-        throw std::runtime_error("Failed to allocate command buffers!");
-    }
+    ThrowIfFailed(vkAllocateCommandBuffers(m_device, &allocInfo, m_commandBuffers.data()),
+        "Failed to allocate command buffers!");
 
     for (size_t i = 0; i < m_commandBuffers.size(); i++) {
         VkCommandBufferBeginInfo beginInfo = {};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = 0;
         beginInfo.pInheritanceInfo = nullptr;
-        if (vkBeginCommandBuffer(m_commandBuffers[i], &beginInfo) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to begin recording command buffer!");
-        }
+        ThrowIfFailed(vkBeginCommandBuffer(m_commandBuffers[i], &beginInfo), 
+            "Failed to begin recording command buffer!");
 
         VkRenderPassBeginInfo renderPassInfo = {};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -957,9 +953,8 @@ void Application::CreateCommandBuffers(){
 
         vkCmdEndRenderPass(m_commandBuffers[i]);
 
-        if(vkEndCommandBuffer(m_commandBuffers[i]) != VK_SUCCESS){
-            throw std::runtime_error("Failed to record command buffer!");
-        }
+        ThrowIfFailed(vkEndCommandBuffer(m_commandBuffers[i]), 
+            "Failed to record command buffer!");
     }
 
 }
