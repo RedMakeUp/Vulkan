@@ -316,7 +316,7 @@ void Application::InitVulkan()
     CreateFramebuffers();
     CreateCommandPool();
     CreateCommandBuffers();
-    CreateSyncObjects();// TODO: Step into here
+    CreateSyncObjects();
 }
 
 void Application::MainLoop()
@@ -971,7 +971,7 @@ void Application::CreateSyncObjects(){
     VkFenceCreateInfo fenceInfo = {};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
+    
     for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++){
         if(vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS ||
             vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS ||
@@ -983,7 +983,7 @@ void Application::CreateSyncObjects(){
 }
 
 void Application::DrawFrame(){
-
+    // Wait for the n-th frame(specified by m_currentFrame) finishing
     vkWaitForFences(m_device, 1, &m_inflightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
 
     // Acquire an image from the swap chain
@@ -996,10 +996,11 @@ void Application::DrawFrame(){
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
-
+    // Check if a previous frame is using this image 
     if(m_imagesInFlight[imageIndex] != VK_NULL_HANDLE){
         vkWaitForFences(m_device, 1, &m_imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
     }
+    // Mark the image as now being in use by this frame
     m_imagesInFlight[imageIndex] = m_inflightFences[m_currentFrame];
 
     // Submitting the command buffer
@@ -1007,25 +1008,26 @@ void Application::DrawFrame(){
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.waitSemaphoreCount = 1;// Specify which semaphores to wait on before execution
     submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
+    submitInfo.pWaitDstStageMask = waitStages;// And in which stages of the pipeline to wait
+    submitInfo.commandBufferCount = 1;// Specify which command buffers to actually submit for execution
     submitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];
     VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[m_currentFrame]};
-    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.signalSemaphoreCount = 1;// Specify which semaphores to signal once the command buffers have finished execution
     submitInfo.pSignalSemaphores = signalSemaphores;
     
+    // We manually need to restore the fence to the unsignaled state before actually using the fance
     vkResetFences(m_device, 1, &m_inflightFences[m_currentFrame]);
     
-    if(vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inflightFences[m_currentFrame]) != VK_SUCCESS){
-        throw std::runtime_error("Failed to submit draw command buffer!");
-    }
+    // Submit the command buffer to the graphics queue and the fence will be signaled once the command buffer finished executing
+    ThrowIfFailed(vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inflightFences[m_currentFrame]),
+        "Failed to submit draw command buffer!");
 
     // Presentation
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.waitSemaphoreCount = 1;// Specify which semaphores to wait on before presentation can happen
     presentInfo.pWaitSemaphores = signalSemaphores;
     VkSwapchainKHR swapChains[] = {m_swapChain};
     presentInfo.swapchainCount = 1;
@@ -1040,6 +1042,7 @@ void Application::DrawFrame(){
         throw std::runtime_error("Failed to present swap chain image!");
     }
 
+    // Advance to the next frame
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
