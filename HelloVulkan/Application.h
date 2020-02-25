@@ -68,9 +68,11 @@ private:
     void CreateFramebuffers();
     void CreateCommandPool();
     void CreateCommandBuffers();
+    void CreateVertexBuffers();
     void CreateSyncObjects();
     void DrawFrame();
     void RecreateSwapChain();
+    uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertices);
 
 private:
     // Check if the validation layers we need are supported
@@ -116,6 +118,8 @@ private:
     std::vector<VkFence> m_inflightFences;
     std::vector<VkFence> m_imagesInFlight;
     size_t m_currentFrame = 0;
+    VkBuffer m_vertexBuffer;
+    VkDeviceMemory m_vertexBufferMemory;
 
     bool m_frameBufferResized = false;
 };
