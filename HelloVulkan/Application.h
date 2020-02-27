@@ -68,7 +68,10 @@ private:
     void CreateFramebuffers();
     void CreateCommandPool();
     void CreateCommandBuffers();
-    void CreateVertexBuffers();
+    void CreateVertexBuffer();
+    void CreateIndexBuffer();
+    void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+    void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void CreateSyncObjects();
     void DrawFrame();
     void RecreateSwapChain();
@@ -120,6 +123,8 @@ private:
     size_t m_currentFrame = 0;
     VkBuffer m_vertexBuffer;
     VkDeviceMemory m_vertexBufferMemory;
+    VkBuffer m_indexBuffer;
+    VkDeviceMemory m_indexBufferMemory;
 
     bool m_frameBufferResized = false;
 };
